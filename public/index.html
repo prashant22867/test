@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Alpaca — Balance &amp; Trades</title>
+    <style>
+      :root {
+        --bg: #0f1115;
+        --card: #191c23;
+        --border: #2a2e37;
+        --text: #e6e8ec;
+        --muted: #9aa0ab;
+        --accent: #4c8dff;
+        --pos: #2ec27e;
+        --neg: #f2555a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px 16px;
+        font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .wrap { max-width: 900px; margin: 0 auto; }
+      header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+      }
+      h1 { font-size: 20px; margin: 0; }
+      #status { color: var(--muted); font-size: 13px; }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 12px;
+        margin-bottom: 28px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 14px 16px;
+      }
+      .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+      .card .value { font-size: 22px; font-weight: 600; margin-top: 4px; }
+      h2 { font-size: 15px; color: var(--muted); font-weight: 600; margin: 0 0 10px; }
+      table { width: 100%; border-collapse: collapse; font-size: 14px; }
+      th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+      th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; }
+      td.num { text-align: right; font-variant-numeric: tabular-nums; }
+      .buy { color: var(--pos); }
+      .sell { color: var(--neg); }
+      .empty { color: var(--muted); padding: 16px 0; }
+      .err { color: var(--neg); background: rgba(242,85,90,0.1); border: 1px solid var(--neg); border-radius: 8px; padding: 12px; margin-bottom: 20px; }
+      .hidden { display: none; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>Alpaca — Balance &amp; Trades</h1>
+        <span id="status">Loading…</span>
+      </header>
+
+      <div id="error" class="err hidden"></div>
+
+      <div class="cards" id="cards"></div>
+
+      <h2>Recent trades (fills)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Symbol</th>
+            <th>Side</th>
+            <th class="num">Qty</th>
+            <th class="num">Price</th>
+          </tr>
+        </thead>
+        <tbody id="trades">
+          <tr><td colspan="5" class="empty">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <script>
+      const money = (n) =>
+        n == null || n === ""
+          ? "—"
+          : Number(n).toLocaleString(undefined, { style: "currency", currency: "USD" });
+
+      function showError(msg) {
+        const el = document.getElementById("error");
+        el.textContent = msg;
+        el.classList.remove("hidden");
+      }
+
+      async function get(path) {
+        const res = await fetch(path);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Request to ${path} failed`);
+        return data;
+      }
+
+      function renderAccount(a) {
+        const cards = [
+          ["Portfolio value", money(a.portfolio_value ?? a.equity)],
+          ["Cash", money(a.cash)],
+          ["Buying power", money(a.buying_power)],
+          ["Equity", money(a.equity)],
+        ];
+        document.getElementById("cards").innerHTML = cards
+          .map(
+            ([label, value]) =>
+              `<div class="card"><div class="label">${label}</div><div class="value">${value}</div></div>`
+          )
+          .join("");
+      }
+
+      function renderTrades(fills) {
+        const tbody = document.getElementById("trades");
+        if (!Array.isArray(fills) || fills.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="5" class="empty">No fills found.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = fills
+          .map((f) => {
+            const t = f.transaction_time
+              ? new Date(f.transaction_time).toLocaleString()
+              : "—";
+            const side = (f.side || "").toLowerCase();
+            const cls = side.startsWith("s") ? "sell" : "buy";
+            return `<tr>
+              <td>${t}</td>
+              <td>${f.symbol ?? "—"}</td>
+              <td class="${cls}">${f.side ?? "—"}</td>
+              <td class="num">${f.qty ?? "—"}</td>
+              <td class="num">${money(f.price)}</td>
+            </tr>`;
+          })
+          .join("");
+      }
+
+      async function refresh() {
+        try {
+          const [account, trades] = await Promise.all([
+            get("/api/account"),
+            get("/api/trades"),
+          ]);
+          renderAccount(account);
+          renderTrades(trades);
+          document.getElementById("error").classList.add("hidden");
+          document.getElementById("status").textContent =
+            "Updated " + new Date().toLocaleTimeString();
+        } catch (e) {
+          showError(e.message);
+          document.getElementById("status").textContent = "Error";
+        }
+      }
+
+      refresh();
+      // Light polling so the page stays roughly live.
+      setInterval(refresh, 15000);
+    </script>
+  </body>
+</html>
