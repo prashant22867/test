@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Sky Check — Weather</title>
+<meta name="description" content="Live weather and a 7-day forecast, powered by the free Open-Meteo API. No API key required." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+<style>
+  :root {
+    --bg: #eef3fb;
+    --bg-grad: radial-gradient(1200px 600px at 50% -10%, #dcecff 0%, #eef3fb 55%, #eef3fb 100%);
+    --surface: #ffffff;
+    --surface-2: #f2f6fc;
+    --border: #dbe3ef;
+    --text: #16202e;
+    --muted: #5c6a7d;
+    --accent: #2f7bff;
+    --sun: #f7a916;
+    --shadow: 0 1px 2px rgba(20,34,58,0.06), 0 12px 30px rgba(20,34,58,0.08);
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --bg: #0c1119;
+      --bg-grad: radial-gradient(1200px 600px at 50% -10%, #16233a 0%, #0c1119 55%, #0c1119 100%);
+      --surface: #151b26;
+      --surface-2: #1c2431;
+      --border: #26303f;
+      --text: #e8edf5;
+      --muted: #93a1b5;
+      --accent: #5b9bff;
+      --sun: #ffbf3d;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 14px 34px rgba(0,0,0,0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0c1119;
+    --bg-grad: radial-gradient(1200px 600px at 50% -10%, #16233a 0%, #0c1119 55%, #0c1119 100%);
+    --surface: #151b26;
+    --surface-2: #1c2431;
+    --border: #26303f;
+    --text: #e8edf5;
+    --muted: #93a1b5;
+    --accent: #5b9bff;
+    --sun: #ffbf3d;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 14px 34px rgba(0,0,0,0.4);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    background-image: var(--bg-grad);
+    background-attachment: fixed;
+    color: var(--text);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+  .wrap {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: max(env(safe-area-inset-top), 22px) 18px 44px;
+  }
+
+  header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .mark { font-size: 24px; }
+  h1 { font-size: 19px; margin: 0; letter-spacing: -0.01em; }
+  button.theme {
+    background: var(--surface); color: var(--text); border: 1px solid var(--border);
+    border-radius: 999px; padding: 7px 13px; font-size: 12.5px; font-weight: 500; cursor: pointer;
+    box-shadow: var(--shadow); font-family: inherit;
+  }
+  button.theme:focus-visible, input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  form.search { display: flex; gap: 9px; margin-bottom: 18px; }
+  .field { position: relative; flex: 1; }
+  input[type="search"] {
+    width: 100%; padding: 13px 15px; font-size: 15px; font-family: inherit;
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: 13px; box-shadow: var(--shadow);
+  }
+  input::placeholder { color: var(--muted); }
+  button.go, button.loc {
+    border: 0; border-radius: 13px; padding: 0 16px; font-size: 14px; font-weight: 600;
+    cursor: pointer; font-family: inherit; box-shadow: var(--shadow); white-space: nowrap;
+  }
+  button.go { background: var(--accent); color: #fff; }
+  button.loc { background: var(--surface); color: var(--text); border: 1px solid var(--border); padding: 0 13px; }
+
+  .status { color: var(--muted); font-size: 13.5px; padding: 8px 2px; min-height: 20px; }
+  .status.err { color: #d64550; }
+
+  .hero {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+    box-shadow: var(--shadow); padding: 22px; margin-bottom: 16px;
+  }
+  .hero-top { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+  .place { font-size: 15px; color: var(--muted); font-weight: 500; }
+  .place strong { color: var(--text); font-weight: 700; font-size: 17px; display: block; }
+  .now { display: flex; align-items: center; gap: 16px; margin-top: 8px; }
+  .now .icon { font-size: 64px; line-height: 1; }
+  .temp { font-size: 60px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .temp span { font-size: 26px; color: var(--muted); font-weight: 600; }
+  .cond { font-size: 16px; font-weight: 600; margin-top: 2px; }
+  .feels { font-size: 13.5px; color: var(--muted); }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 11px; margin-top: 18px; }
+  .tile { background: var(--surface-2); border: 1px solid var(--border); border-radius: 13px; padding: 12px 14px; }
+  .tile .k { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+  .tile .v { font-size: 19px; font-weight: 700; margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 700; margin: 22px 4px 10px; }
+  .days {
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px;
+    overflow-x: auto; padding-bottom: 4px;
+  }
+  .day {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 13px;
+    padding: 12px 6px; text-align: center; box-shadow: var(--shadow); min-width: 64px;
+  }
+  .day .dow { font-size: 12px; color: var(--muted); font-weight: 600; }
+  .day .dico { font-size: 26px; margin: 6px 0; }
+  .day .hi { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .day .lo { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  footer { color: var(--muted); font-size: 12px; margin-top: 26px; text-align: center; line-height: 1.6; }
+  footer a { color: var(--accent); }
+  [hidden] { display: none !important; }
+  @media (prefers-reduced-motion: no-preference) {
+    .hero, .day, .tile { transition: transform .15s ease; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="mark">⛅</span><h1>Sky Check</h1></div>
+    <button class="theme" id="themeBtn" type="button">Dark</button>
+  </header>
+
+  <form class="search" id="searchForm">
+    <div class="field">
+      <input type="search" id="q" placeholder="Search a city…" autocomplete="off" aria-label="City name" />
+    </div>
+    <button class="go" type="submit">Search</button>
+    <button class="loc" id="locBtn" type="button" title="Use my location" aria-label="Use my location">📍</button>
+  </form>
+
+  <div class="status" id="status" role="status" aria-live="polite">Search a city, or tap 📍 for your location.</div>
+
+  <div id="result" hidden>
+    <div class="hero">
+      <div class="hero-top">
+        <div class="place"><span id="placeName"></span><strong id="placeMain"></strong></div>
+        <div class="place" id="localTime"></div>
+      </div>
+      <div class="now">
+        <div class="icon" id="nowIcon">☀️</div>
+        <div>
+          <div class="temp"><span id="tempVal">--</span><span>°C</span></div>
+          <div class="cond" id="condText"></div>
+          <div class="feels" id="feelsText"></div>
+        </div>
+      </div>
+      <div class="tiles">
+        <div class="tile"><div class="k">Humidity</div><div class="v" id="humVal">--</div></div>
+        <div class="tile"><div class="k">Wind</div><div class="v" id="windVal">--</div></div>
+        <div class="tile"><div class="k">Precip</div><div class="v" id="precVal">--</div></div>
+        <div class="tile"><div class="k">Day / night</div><div class="v" id="dayVal">--</div></div>
+      </div>
+    </div>
+
+    <h2>7-day forecast</h2>
+    <div class="days" id="days"></div>
+  </div>
+
+  <footer>
+    Live data from <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> — free, no API key.
+    Runs entirely in your browser, so it works on plain static hosting like GitHub Pages.
+  </footer>
+</div>
+
+<script>
+  // WMO weather interpretation codes → label + emoji.
+  const WMO = {
+    0:  ["Clear sky", "☀️"], 1: ["Mainly clear", "🌤️"], 2: ["Partly cloudy", "⛅"], 3: ["Overcast", "☁️"],
+    45: ["Fog", "🌫️"], 48: ["Rime fog", "🌫️"],
+    51: ["Light drizzle", "🌦️"], 53: ["Drizzle", "🌦️"], 55: ["Heavy drizzle", "🌧️"],
+    56: ["Freezing drizzle", "🌧️"], 57: ["Freezing drizzle", "🌧️"],
+    61: ["Light rain", "🌦️"], 63: ["Rain", "🌧️"], 65: ["Heavy rain", "🌧️"],
+    66: ["Freezing rain", "🌧️"], 67: ["Freezing rain", "🌧️"],
+    71: ["Light snow", "🌨️"], 73: ["Snow", "🌨️"], 75: ["Heavy snow", "❄️"], 77: ["Snow grains", "🌨️"],
+    80: ["Rain showers", "🌦️"], 81: ["Rain showers", "🌧️"], 82: ["Violent showers", "⛈️"],
+    85: ["Snow showers", "🌨️"], 86: ["Snow showers", "❄️"],
+    95: ["Thunderstorm", "⛈️"], 96: ["Thunderstorm + hail", "⛈️"], 99: ["Thunderstorm + hail", "⛈️"],
+  };
+  const wmo = (c) => WMO[c] || ["—", "❓"];
+
+  const $ = (id) => document.getElementById(id);
+  const status = $("status");
+  function setStatus(msg, isErr) {
+    status.textContent = msg;
+    status.classList.toggle("err", !!isErr);
+  }
+
+  async function geocode(name) {
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=1&language=en&format=json`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("Location lookup failed");
+    const j = await r.json();
+    if (!j.results || !j.results.length) throw new Error(`No place found for “${name}”.`);
+    return j.results[0];
+  }
+
+  async function getForecast(lat, lon) {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`
+      + `&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m`
+      + `&daily=weather_code,temperature_2m_max,temperature_2m_min`
+      + `&timezone=auto&forecast_days=7`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("Weather lookup failed");
+    return r.json();
+  }
+
+  function render(place, data) {
+    const c = data.current;
+    const [label, icon] = wmo(c.weather_code);
+    $("placeName").textContent = place.admin1 ? place.admin1 + (place.country ? ", " + place.country : "") : (place.country || "");
+    $("placeMain").textContent = place.name;
+    $("nowIcon").textContent = icon;
+    $("tempVal").textContent = Math.round(c.temperature_2m);
+    $("condText").textContent = label;
+    $("feelsText").textContent = `Feels like ${Math.round(c.apparent_temperature)}°C`;
+    $("humVal").textContent = `${c.relative_humidity_2m}%`;
+    $("windVal").textContent = `${Math.round(c.wind_speed_10m)} km/h`;
+    $("precVal").textContent = `${c.precipitation} mm`;
+    $("dayVal").textContent = c.is_day ? "Day ☀️" : "Night 🌙";
+    try {
+      $("localTime").textContent = new Date().toLocaleTimeString(undefined,
+        { hour: "2-digit", minute: "2-digit", timeZone: data.timezone });
+    } catch (e) { $("localTime").textContent = ""; }
+
+    const d = data.daily;
+    $("days").innerHTML = d.time.map((iso, i) => {
+      const [, dico] = wmo(d.weather_code[i]);
+      const dow = new Date(iso + "T00:00").toLocaleDateString(undefined, { weekday: "short" });
+      return `<div class="day">
+        <div class="dow">${i === 0 ? "Today" : dow}</div>
+        <div class="dico">${dico}</div>
+        <div class="hi">${Math.round(d.temperature_2m_max[i])}°</div>
+        <div class="lo">${Math.round(d.temperature_2m_min[i])}°</div>
+      </div>`;
+    }).join("");
+
+    $("result").hidden = false;
+    setStatus("");
+  }
+
+  async function showByCity(name) {
+    try {
+      setStatus(`Finding “${name}”…`);
+      const place = await geocode(name);
+      setStatus("Loading weather…");
+      const data = await getForecast(place.latitude, place.longitude);
+      render(place, data);
+    } catch (e) { setStatus(e.message, true); }
+  }
+
+  async function showByCoords(lat, lon) {
+    try {
+      setStatus("Loading weather…");
+      const data = await getForecast(lat, lon);
+      render({ name: "Your location", admin1: "", country: "" }, data);
+    } catch (e) { setStatus(e.message, true); }
+  }
+
+  $("searchForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const v = $("q").value.trim();
+    if (v) showByCity(v);
+  });
+
+  $("locBtn").addEventListener("click", () => {
+    if (!navigator.geolocation) { setStatus("Geolocation isn't available in this browser.", true); return; }
+    setStatus("Getting your location…");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => showByCoords(pos.coords.latitude, pos.coords.longitude),
+      () => setStatus("Couldn't get your location — try searching a city.", true)
+    );
+  });
+
+  // Theme toggle (per-viewer only).
+  const tbtn = $("themeBtn");
+  const isDark = () => {
+    const t = document.documentElement.getAttribute("data-theme");
+    return t ? t === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  };
+  const syncBtn = () => { tbtn.textContent = isDark() ? "Light" : "Dark"; };
+  tbtn.addEventListener("click", () => {
+    const next = isDark() ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("skycheck-theme", next); } catch (e) {}
+    syncBtn();
+  });
+  try {
+    const saved = localStorage.getItem("skycheck-theme");
+    if (saved) document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) {}
+  syncBtn();
+
+  // Open on a sensible default so the first view isn't empty.
+  showByCity("London");
+</script>
+</body>
+</html>
