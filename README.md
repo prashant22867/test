@@ -8,7 +8,20 @@ browser** — the page only talks to local `/api/*` routes, which forward to Alp
 ## What it shows
 
 - **Balance cards** — portfolio value, cash, buying power, equity (`GET /v2/account`)
+- **Open positions** — qty, avg entry, current price, market value, unrealized P&L (`GET /v2/positions`)
 - **Recent trades** — your executions/fills, newest first (`GET /v2/account/activities/FILL`)
+
+## Try it with no keys (demo mode)
+
+Want to see the page before wiring up Alpaca? Run it with baked-in sample data:
+
+```bash
+npm install
+DEMO=true npm start        # → http://localhost:3000
+```
+
+`DEMO=true` serves realistic sample balance, positions, and fills — no API keys
+or network access required.
 
 ## Setup
 

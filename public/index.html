@@ -55,6 +55,9 @@
       td.num { text-align: right; font-variant-numeric: tabular-nums; }
       .buy { color: var(--pos); }
       .sell { color: var(--neg); }
+      .pos { color: var(--pos); }
+      .neg { color: var(--neg); }
+      section { margin-bottom: 28px; }
       .empty { color: var(--muted); padding: 16px 0; }
       .err { color: var(--neg); background: rgba(242,85,90,0.1); border: 1px solid var(--neg); border-radius: 8px; padding: 12px; margin-bottom: 20px; }
       .hidden { display: none; }
@@ -71,21 +74,43 @@
 
       <div class="cards" id="cards"></div>
 
-      <h2>Recent trades (fills)</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Symbol</th>
-            <th>Side</th>
-            <th class="num">Qty</th>
-            <th class="num">Price</th>
-          </tr>
-        </thead>
-        <tbody id="trades">
-          <tr><td colspan="5" class="empty">Loading…</td></tr>
-        </tbody>
-      </table>
+      <section>
+        <h2>Open positions</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th class="num">Qty</th>
+              <th class="num">Avg entry</th>
+              <th class="num">Current</th>
+              <th class="num">Market value</th>
+              <th class="num">Unrealized P&amp;L</th>
+            </tr>
+          </thead>
+          <tbody id="positions">
+            <tr><td colspan="7" class="empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Recent trades (fills)</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th class="num">Qty</th>
+              <th class="num">Price</th>
+            </tr>
+          </thead>
+          <tbody id="trades">
+            <tr><td colspan="5" class="empty">Loading…</td></tr>
+          </tbody>
+        </table>
+      </section>
     </div>
 
     <script>
@@ -122,6 +147,32 @@
           .join("");
       }
 
+      function renderPositions(positions) {
+        const tbody = document.getElementById("positions");
+        if (!Array.isArray(positions) || positions.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" class="empty">No open positions.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = positions
+          .map((p) => {
+            const pl = Number(p.unrealized_pl);
+            const plc = isFinite(pl) && pl < 0 ? "neg" : "pos";
+            const plpc = p.unrealized_plpc != null
+              ? ` (${(Number(p.unrealized_plpc) * 100).toFixed(2)}%)`
+              : "";
+            return `<tr>
+              <td>${p.symbol ?? "—"}</td>
+              <td>${p.side ?? "—"}</td>
+              <td class="num">${p.qty ?? "—"}</td>
+              <td class="num">${money(p.avg_entry_price)}</td>
+              <td class="num">${money(p.current_price)}</td>
+              <td class="num">${money(p.market_value)}</td>
+              <td class="num ${plc}">${money(p.unrealized_pl)}${plpc}</td>
+            </tr>`;
+          })
+          .join("");
+      }
+
       function renderTrades(fills) {
         const tbody = document.getElementById("trades");
         if (!Array.isArray(fills) || fills.length === 0) {
@@ -148,11 +199,13 @@
 
       async function refresh() {
         try {
-          const [account, trades] = await Promise.all([
+          const [account, positions, trades] = await Promise.all([
             get("/api/account"),
+            get("/api/positions"),
             get("/api/trades"),
           ]);
           renderAccount(account);
+          renderPositions(positions);
           renderTrades(trades);
           document.getElementById("error").classList.add("hidden");
           document.getElementById("status").textContent =
