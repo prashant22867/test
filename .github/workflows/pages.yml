@@ -1,0 +1,43 @@
+name: Deploy weather page to GitHub Pages
+
+on:
+  push:
+    branches: ["claude/tradovate-historic-trades-api-eelop9"]
+  workflow_dispatch:
+
+# Permissions the GITHUB_TOKEN needs to enable Pages and publish.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; don't cancel an in-progress one.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # enablement: true turns Pages on (source = GitHub Actions) if it isn't already.
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      # Publish only the static site in docs/ (the weather page).
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
